@@ -45,12 +45,10 @@ AGENTS.md
 
 ## Quick start
 
-1. Create a virtual environment and install the package in editable mode.
+1. Sync the project with `uv`.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e . pytest
+uv sync
 ```
 
 2. Copy the example config and plan.
@@ -65,7 +63,7 @@ cp examples/plan.md plan.md
 4. Run `devloop`.
 
 ```bash
-devloop run --plan plan.md --config devloop.toml
+uv run devloop run --plan plan.md --config devloop.toml
 ```
 
 ## Required agent protocol
@@ -98,7 +96,7 @@ Out of scope:
 - Refactoring the auth module
 
 Checks:
-- pytest -q
+- uv run pytest -q
 ```
 
 The parser also supports inline forms like `Goal: ...` and `Constraints: ...`.
@@ -136,7 +134,7 @@ You should usually ignore `.devloop/` in git so run artifacts do not become part
 Run the test suite with:
 
 ```bash
-.venv/bin/python -m pytest
+uv run pytest
 ```
 
 The current suite covers config validation, plan parsing, artifact helpers, subprocess handling, check execution, prompt rendering, git helpers, CLI behavior, the generic CLI agent adapter, and multiple runner scenarios including success, commit creation, blocking audit failure, and stall detection.

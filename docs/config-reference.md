@@ -202,12 +202,12 @@ cwd_mode = "snapshot"
 
 [[checks.required]]
 name = "tests"
-command = "pytest -q"
+command = "uv run pytest -q"
 timeout_secs = 900
 
 [[checks.advisory]]
 name = "lint"
-command = "ruff check ."
+command = "uv run ruff check ."
 timeout_secs = 300
 ```
 
