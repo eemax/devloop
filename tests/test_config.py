@@ -49,6 +49,32 @@ command = ["claude", "-p"]
         load_config(config_path)
 
 
+def test_load_config_parses_observability_settings(tmp_path: Path) -> None:
+    config_path = tmp_path / "devloop.toml"
+    config_path.write_text(
+        """
+[run]
+repo = "."
+
+[agents.implementer]
+name = "claude"
+command = ["claude", "-p"]
+
+[agents.auditor]
+name = "codex"
+command = ["codex", "exec"]
+
+[observability]
+max_inline_text_chars = 123
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.observability.max_inline_text_chars == 123
+
+
 def test_load_config_rejects_invalid_values(tmp_path: Path) -> None:
     config_path = tmp_path / "devloop.toml"
     config_path.write_text(

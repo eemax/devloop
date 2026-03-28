@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from devloop.adapters.base import AgentAdapter
@@ -36,10 +37,14 @@ class CliAgentAdapter(AgentAdapter):
         return AgentInvocationResult(
             name=self.config.name,
             command=command,
+            resolved_command=shutil.which(command[0]),
             cwd=cwd,
+            input_mode=self.config.input_mode,
             stdout=completed.stdout,
             stderr=completed.stderr,
             exit_code=completed.returncode,
             duration_secs=completed.duration_secs,
+            started_at=completed.started_at,
+            finished_at=completed.finished_at,
             json_payload=json_payload,
         )

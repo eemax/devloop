@@ -9,6 +9,7 @@ def build_markdown_report(run_spec: RunSpec, rounds: list[RoundState], outcome: 
     lines = [
         f"# devloop report: {run_spec.run_id}",
         "",
+        f"- Trace: {run_spec.trace_id}",
         f"- Goal: {run_spec.goal}",
         f"- Repo: {run_spec.repo_root}",
         f"- Base commit: {run_spec.base_commit}",

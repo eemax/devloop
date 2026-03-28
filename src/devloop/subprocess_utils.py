@@ -4,6 +4,7 @@ import dataclasses
 import shutil
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -15,6 +16,8 @@ class CommandExecutionError(RuntimeError):
 class CommandOutput:
     process: subprocess.CompletedProcess[str]
     duration_secs: float
+    started_at: datetime
+    finished_at: datetime
 
     @property
     def returncode(self) -> int:
@@ -43,6 +46,7 @@ def run_command(
     stdin_text: str | None = None,
     check: bool = False,
 ) -> CommandOutput:
+    started_wall = datetime.now(timezone.utc)
     started_at = time.monotonic()
     try:
         result = subprocess.run(
@@ -61,4 +65,9 @@ def run_command(
     except OSError as exc:
         raise CommandExecutionError(f"failed to execute {' '.join(command)}: {exc}") from exc
 
-    return CommandOutput(process=result, duration_secs=time.monotonic() - started_at)
+    return CommandOutput(
+        process=result,
+        duration_secs=time.monotonic() - started_at,
+        started_at=started_wall,
+        finished_at=datetime.now(timezone.utc),
+    )

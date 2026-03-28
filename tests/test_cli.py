@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+from devloop.canary import CanaryWorkspace
 from devloop.cli import main
 from devloop.models import CommandResult, FinalStatus, RunOutcome
 from tests.helpers import build_config_text, init_git_repo, write_plan
@@ -83,3 +84,49 @@ command = ["audit"]
     output = capsys.readouterr()
     assert "devloop finished with status: success" in output.out
     assert "commit: abc123" in output.out
+
+
+def test_cli_canary_prepare_only_reports_workspace_paths(tmp_path: Path, monkeypatch, capsys) -> None:
+    workspace = CanaryWorkspace(
+        root=tmp_path / "canary",
+        repo=tmp_path / "canary" / "repo",
+        config_path=tmp_path / "canary" / "config.toml",
+        plan_path=tmp_path / "canary" / "plan.md",
+    )
+
+    monkeypatch.setattr("devloop.cli.prepare_canary_workspace", lambda root, reset: workspace)
+
+    assert main(["canary", "--prepare-only", "--root", str(workspace.root)]) == 0
+    output = capsys.readouterr()
+    assert f"canary workspace prepared at: {workspace.root}" in output.out
+    assert f"repo: {workspace.repo}" in output.out
+    assert f"plan: {workspace.plan_path}" in output.out
+    assert f"config: {workspace.config_path}" in output.out
+
+
+def test_cli_canary_run_reports_outcome(tmp_path: Path, monkeypatch, capsys) -> None:
+    workspace = CanaryWorkspace(
+        root=tmp_path / "canary",
+        repo=tmp_path / "canary" / "repo",
+        config_path=tmp_path / "canary" / "config.toml",
+        plan_path=tmp_path / "canary" / "plan.md",
+    )
+    outcome = RunOutcome(
+        status=FinalStatus.SUCCESS,
+        rounds_completed=1,
+        final_checks=[],
+        final_findings=[],
+        changed_files=["README.md"],
+        commit_sha=None,
+        branch_name=None,
+        report_path=workspace.repo / ".devloop" / "runs" / "run-1" / "report.md",
+        report_json_path=workspace.repo / ".devloop" / "runs" / "run-1" / "report.json",
+    )
+
+    monkeypatch.setattr("devloop.cli.run_canary", lambda root, reset: (workspace, outcome))
+
+    assert main(["canary", "--root", str(workspace.root)]) == 0
+    output = capsys.readouterr()
+    assert f"canary workspace: {workspace.root}" in output.out
+    assert "devloop finished with status: success" in output.out
+    assert f"report: {outcome.report_path}" in output.out

@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from devloop.canary import default_canary_root, prepare_canary_workspace, run_canary
 from devloop.config import ConfigError, load_config
 from devloop.git_ops import GitError, ensure_git_repo
 from devloop.plan_parser import load_plan
@@ -32,6 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     resume_parser = subparsers.add_parser("resume", help="Resume a paused run.")
     resume_parser.add_argument("run_id", help="Run identifier.")
+
+    canary_parser = subparsers.add_parser("canary", help="Prepare or run the disposable canary smoke test.")
+    canary_parser.add_argument("--root", type=Path, default=default_canary_root(), help="Workspace root for the canary repo.")
+    canary_parser.add_argument("--reset", action="store_true", help="Recreate the canary workspace from scratch before preparing it.")
+    canary_parser.add_argument("--prepare-only", action="store_true", help="Only prepare the canary workspace; do not execute the run.")
 
     return parser
 
@@ -66,6 +72,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "resume":
             print(f"resume is not implemented yet for run {args.run_id}", file=sys.stderr)
             return 1
+
+        if args.command == "canary":
+            return run_canary_command(args.root, reset=args.reset, prepare_only=args.prepare_only)
     except (ConfigError, GitError, RunnerError, CommandExecutionError) as exc:
         print(str(exc), file=sys.stderr)
         return _exit_code_for_error(exc)
@@ -88,6 +97,23 @@ def run_doctor(config_path: Path) -> int:
         indent=2,
     ))
     return 0
+
+
+def run_canary_command(root: Path, *, reset: bool, prepare_only: bool) -> int:
+    if prepare_only:
+        workspace = prepare_canary_workspace(root, reset=reset)
+        print(f"canary workspace prepared at: {workspace.root}")
+        print(f"repo: {workspace.repo}")
+        print(f"plan: {workspace.plan_path}")
+        print(f"config: {workspace.config_path}")
+        return 0
+
+    workspace, outcome = run_canary(root, reset=reset)
+    print(f"canary workspace: {workspace.root}")
+    print(f"devloop finished with status: {outcome.status.value}")
+    print(f"report: {outcome.report_path}")
+    print(f"report json: {outcome.report_json_path}")
+    return 0 if outcome.status.value == "success" else 3
 
 
 def print_report(run_dir: Path) -> int:

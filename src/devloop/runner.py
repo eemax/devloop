@@ -33,6 +33,7 @@ from devloop.models import (
     RunOutcome,
     RunSpec,
 )
+from devloop.observability import build_agent_invocation_artifact, build_report_payload, build_trace_manifest, trace_id_for_run
 from devloop.prompts import render_auditor_prompt, render_implementer_prompt
 from devloop.report import build_markdown_report, default_commit_message, report_paths
 from devloop.stop_conditions import blocking_findings, decide_round_stop
@@ -62,9 +63,11 @@ def run_devloop(config: Config, plan: PlanSpec) -> RunOutcome:
     base_commit = current_head(repo_root)
     run_spec = RunSpec(
         run_id=run_id,
+        trace_id=trace_id_for_run(run_id),
         repo_root=repo_root,
         base_commit=base_commit,
         artifact_dir=artifact_dir,
+        observability=config.observability,
         goal=plan.goal,
         acceptance_criteria=plan.acceptance_criteria,
         constraints=plan.constraints,
@@ -80,6 +83,7 @@ def run_devloop(config: Config, plan: PlanSpec) -> RunOutcome:
         raw_plan=plan.body,
     )
     write_json(artifact_dir / "run_spec.json", run_spec.model_dump(mode="json"))
+    write_json(artifact_dir / "trace.json", build_trace_manifest(run_spec, []))
 
     implementer = CliAgentAdapter(config.implementer, timeout_secs=config.run.timeout_secs)
     auditor = CliAgentAdapter(config.auditor, timeout_secs=config.run.timeout_secs)
@@ -96,10 +100,28 @@ def run_devloop(config: Config, plan: PlanSpec) -> RunOutcome:
 
         implementer_prompt = render_implementer_prompt(run_spec, plan, unresolved_findings, previous_summary)
         implementer_prompt_path = round_dir / "implementer_prompt.txt"
+        implementer_stdout_path = round_dir / "implementer_stdout.txt"
+        implementer_stderr_path = round_dir / "implementer_stderr.txt"
+        implementer_invocation_path = round_dir / "implementer_invocation.json"
         write_text(implementer_prompt_path, implementer_prompt)
         implementer_result = implementer.run(implementer_prompt, cwd=repo_root, prompt_path=implementer_prompt_path)
-        write_text(round_dir / "implementer_stdout.txt", implementer_result.stdout)
-        write_text(round_dir / "implementer_stderr.txt", implementer_result.stderr)
+        write_text(implementer_stdout_path, implementer_result.stdout)
+        write_text(implementer_stderr_path, implementer_result.stderr)
+        write_json(
+            implementer_invocation_path,
+            build_agent_invocation_artifact(
+                role="implementer",
+                round_number=round_number,
+                trace_id=run_spec.trace_id,
+                result=implementer_result,
+                prompt=implementer_prompt,
+                prompt_path=implementer_prompt_path,
+                stdout_path=implementer_stdout_path,
+                stderr_path=implementer_stderr_path,
+                artifact_root=artifact_dir,
+                max_inline_text_chars=config.observability.max_inline_text_chars,
+            ),
+        )
 
         if implementer_result.exit_code != 0:
             raise RunnerError(f"implementer command exited with {implementer_result.exit_code}")
@@ -135,11 +157,29 @@ def run_devloop(config: Config, plan: PlanSpec) -> RunOutcome:
         snapshot_dir = _build_audit_snapshot(round_dir, run_spec, implementer_report, cumulative_patch, round_patch, check_results, unresolved_findings)
         auditor_prompt = render_auditor_prompt(run_spec, unresolved_findings)
         auditor_prompt_path = round_dir / "auditor_prompt.txt"
+        auditor_stdout_path = round_dir / "auditor_stdout.txt"
+        auditor_stderr_path = round_dir / "auditor_stderr.txt"
+        auditor_invocation_path = round_dir / "auditor_invocation.json"
         write_text(auditor_prompt_path, auditor_prompt)
         audit_cwd = snapshot_dir if config.auditor.cwd_mode.value == "snapshot" else repo_root
         audit_result = auditor.run(auditor_prompt, cwd=audit_cwd, prompt_path=auditor_prompt_path)
-        write_text(round_dir / "auditor_stdout.txt", audit_result.stdout)
-        write_text(round_dir / "auditor_stderr.txt", audit_result.stderr)
+        write_text(auditor_stdout_path, audit_result.stdout)
+        write_text(auditor_stderr_path, audit_result.stderr)
+        write_json(
+            auditor_invocation_path,
+            build_agent_invocation_artifact(
+                role="auditor",
+                round_number=round_number,
+                trace_id=run_spec.trace_id,
+                result=audit_result,
+                prompt=auditor_prompt,
+                prompt_path=auditor_prompt_path,
+                stdout_path=auditor_stdout_path,
+                stderr_path=auditor_stderr_path,
+                artifact_root=artifact_dir,
+                max_inline_text_chars=config.observability.max_inline_text_chars,
+            ),
+        )
 
         if audit_result.exit_code != 0:
             raise RunnerError(f"auditor command exited with {audit_result.exit_code}")
@@ -211,13 +251,10 @@ def run_devloop(config: Config, plan: PlanSpec) -> RunOutcome:
     )
 
     write_text(report_md_path, build_markdown_report(run_spec, rounds, outcome))
+    write_json(artifact_dir / "trace.json", build_trace_manifest(run_spec, rounds))
     write_json(
         report_json_path,
-        {
-            "run_spec": run_spec.model_dump(mode="json"),
-            "rounds": [round_state.model_dump(mode="json") for round_state in rounds],
-            "outcome": outcome.model_dump(mode="json"),
-        },
+        build_report_payload(run_spec, rounds, outcome),
     )
 
     return outcome

@@ -28,7 +28,7 @@ sequenceDiagram
     participant Snap as "Audit Snapshot"
     participant Audit as "Auditor"
 
-    User->>CLI: run --plan plan.md --config devloop.toml
+    User->>CLI: run --plan plan.md --config config.toml
     CLI->>Runner: load config and plan
     Runner->>Repo: validate repo and capture base commit
     Runner->>Impl: implementer prompt
@@ -50,6 +50,12 @@ sequenceDiagram
 - parses CLI arguments
 - dispatches commands
 - maps exceptions to exit codes
+
+### `canary.py`
+
+- prepares the disposable canary workspace
+- generates the stock canary config and plan
+- powers the `devloop canary` smoke test command
 
 ### `config.py`
 
@@ -105,7 +111,8 @@ Each run gets its own artifact directory, usually:
 Within that directory:
 
 - `run_spec.json` captures the normalized run contract
-- each `rounds/<n>/` directory captures prompts, raw outputs, patches, changed files, snapshots, and findings
+- `trace.json` indexes the run trace, agent threads, and invocation artifact paths
+- each `rounds/<n>/` directory captures prompts, raw outputs, invocation metadata, patches, changed files, snapshots, and findings
 - `report.md` and `report.json` summarize the final result
 
 The artifact model is intentionally append-only for the duration of a run. This makes debugging and postmortems much easier.

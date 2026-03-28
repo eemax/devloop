@@ -29,6 +29,7 @@ The repository currently provides a tested v0.1 skeleton with:
 ```text
 src/devloop/
   cli.py
+  canary.py
   runner.py
   models.py
   config.py
@@ -54,16 +55,22 @@ uv sync
 2. Copy the example config and plan.
 
 ```bash
-cp examples/devloop.toml devloop.toml
+cp examples/config.toml config.toml
 cp examples/plan.md plan.md
 ```
 
-3. Adjust the agent commands in `devloop.toml` for the CLIs you want to use.
+3. Adjust the agent commands and any other knobs in `config.toml`.
 
 4. Run `devloop`.
 
 ```bash
-uv run devloop run --plan plan.md --config devloop.toml
+uv run devloop run --plan plan.md --config config.toml
+```
+
+Before using a real repository, you can smoke-test the full loop with the built-in canary:
+
+```bash
+uv run devloop canary --reset
 ```
 
 ## Required agent protocol
@@ -108,14 +115,19 @@ By default, each run is written under `.devloop/runs/<run_id>/`.
 Important files include:
 
 - `run_spec.json`
+- `trace.json`
 - `rounds/<n>/implementer_prompt.txt`
+- `rounds/<n>/implementer_invocation.json`
 - `rounds/<n>/implementer_stdout.txt`
+- `rounds/<n>/auditor_invocation.json`
 - `rounds/<n>/checks.json`
 - `rounds/<n>/cumulative.patch`
 - `rounds/<n>/audit_snapshot/`
 - `rounds/<n>/findings.json`
 - `report.md`
 - `report.json`
+
+Each run now has a `trace_id`, each agent lane has a stable `thread_id`, and each round call has an `invocation_id`. Agent invocation JSON artifacts capture those IDs along with the exact argv, resolved executable path, cwd, transport (`cli_subprocess`), CLI name, timestamps, parsed JSON payload, and prompt/stdout/stderr references. Full prompt/stdout/stderr bodies stay in the `.txt` artifacts, while JSON surfaces use a configurable truncated preview format like `text_here...[truncated +15592 chars]`.
 
 You should usually ignore `.devloop/` in git so run artifacts do not become part of the reviewed diff.
 
@@ -124,10 +136,22 @@ You should usually ignore `.devloop/` in git so run artifacts do not become part
 - `devloop run --plan <path> --config <path>`
 - `devloop validate-config --config <path>`
 - `devloop doctor --config <path>`
+- `devloop canary [--root <path>] [--reset] [--prepare-only]`
 - `devloop report <run_dir>`
 - `devloop resume <run_id>`
 
 `resume` is reserved for future work and currently returns a not-implemented error.
+
+## Canary smoke test
+
+`devloop canary --reset` prepares a disposable workspace at `~/.devloop-canary`, creates a tiny git repo under `~/.devloop-canary/repo`, writes a stock `config.toml` and `plan.md`, and runs a one-round smoke test against `README.md`.
+
+Useful variants:
+
+- `uv run devloop canary --reset`
+- `uv run devloop canary --prepare-only --reset`
+
+Use `--prepare-only` if you want to inspect or tweak `~/.devloop-canary/config.toml` before running the canary manually. Use `--reset` for most reruns because a successful canary intentionally leaves the disposable repo dirty. The resulting trace and reports are written under `~/.devloop-canary/repo/.devloop/runs/<run_id>/`.
 
 ## Testing
 
@@ -142,6 +166,8 @@ The current suite covers config validation, plan parsing, artifact helpers, subp
 ## Documentation
 
 - [Agent playbook](AGENTS.md)
+- [Config template](examples/config.toml)
+- [Canary guide](docs/canary.md)
 - [Architecture](docs/architecture.md)
 - [Config reference](docs/config-reference.md)
 

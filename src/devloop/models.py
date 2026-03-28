@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,10 @@ class CheckConfig(BaseModel):
     advisory: list[CheckSpec] = Field(default_factory=list)
 
 
+class ObservabilityConfig(BaseModel):
+    max_inline_text_chars: int = Field(default=20_000, ge=0)
+
+
 class RunConfig(BaseModel):
     repo: Path = Path(".")
     max_rounds: int = Field(default=2, ge=1)
@@ -76,6 +81,7 @@ class Config(BaseModel):
     run: RunConfig
     agents: dict[str, AgentConfig]
     checks: CheckConfig = Field(default_factory=CheckConfig)
+    observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
 
     @model_validator(mode="after")
     def validate_required_agents(self) -> "Config":
@@ -105,9 +111,11 @@ class PlanSpec(BaseModel):
 
 class RunSpec(BaseModel):
     run_id: str
+    trace_id: str = ""
     repo_root: Path
     base_commit: str
     artifact_dir: Path
+    observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     goal: str
     acceptance_criteria: list[str]
     constraints: list[str]
@@ -126,11 +134,15 @@ class RunSpec(BaseModel):
 class AgentInvocationResult(BaseModel):
     name: str
     command: list[str]
+    resolved_command: str | None = None
     cwd: Path
+    input_mode: InputMode = InputMode.STDIN
     stdout: str
     stderr: str
     exit_code: int
     duration_secs: float
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    finished_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     json_payload: dict[str, Any] | None = None
 
 

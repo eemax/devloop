@@ -2,6 +2,8 @@
 
 This document lists every supported config option in the current `devloop` TOML schema.
 
+The commented starter template lives in `examples/config.toml`.
+
 ## Top-level structure
 
 ```toml
@@ -18,6 +20,9 @@ This document lists every supported config option in the current `devloop` TOML 
 ...
 
 [[checks.advisory]]
+...
+
+[observability]
 ...
 ```
 
@@ -175,6 +180,17 @@ Each `[[checks.advisory]]` table has the same fields as `[[checks.required]]`:
 
 Advisory checks are recorded in artifacts and reports but do not by themselves force a failed final status.
 
+## `observability`
+
+### `observability.max_inline_text_chars`
+
+- Type: integer
+- Default: `20000`
+- Minimum: `0`
+- Meaning: maximum number of characters in inline JSON previews for prompts, stdout, and stderr
+- Runtime behavior: full prompt/stdout/stderr bodies are still written to `.txt` artifacts; JSON artifacts and `report.json` store previews like `text_here...[truncated +15592 chars]` when the limit is exceeded
+- Trace behavior: each run also gets a `trace_id`, each agent lane gets a stable `thread_id`, and each agent call gets an `invocation_id` in `trace.json`, `report.json`, and the per-round `*_invocation.json` artifacts
+
 ## Example
 
 ```toml
@@ -199,6 +215,9 @@ name = "codex"
 command = ["codex", "exec"]
 input_mode = "stdin"
 cwd_mode = "snapshot"
+
+[observability]
+max_inline_text_chars = 20000
 
 [[checks.required]]
 name = "tests"

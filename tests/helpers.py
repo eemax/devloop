@@ -62,6 +62,7 @@ def build_config_text(
     implementer_cwd_mode: str = "repo",
     auditor_input_mode: str = "stdin",
     auditor_cwd_mode: str = "snapshot",
+    observability_max_inline_text_chars: int = 20_000,
     required_checks: list[dict[str, object]] | None = None,
     advisory_checks: list[dict[str, object]] | None = None,
 ) -> str:
@@ -87,6 +88,9 @@ def build_config_text(
         f"command = {json.dumps(auditor_command)}",
         f"input_mode = {json.dumps(auditor_input_mode)}",
         f"cwd_mode = {json.dumps(auditor_cwd_mode)}",
+        "",
+        "[observability]",
+        f"max_inline_text_chars = {observability_max_inline_text_chars}",
     ]
 
     for check in required_checks or []:

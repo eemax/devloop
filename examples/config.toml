@@ -1,0 +1,80 @@
+# Canonical devloop config template.
+#
+# Tune the knobs below, then run:
+#   uv run devloop run --plan plan.md --config config.toml
+#
+# Most teams will only need to change:
+# - the implementer / auditor commands
+# - max_rounds
+# - checks.required / checks.advisory
+# - observability.max_inline_text_chars
+
+[run]
+# Git repo that devloop should operate in.
+repo = "."
+
+# Maximum implementer / auditor rounds before finalization.
+max_rounds = 2
+
+# Create a commit if the run ends in success.
+commit_on_success = false
+
+# Create a throwaway branch before the loop starts.
+create_branch = true
+
+# When create_branch = true, branches look like:
+#   <branch_prefix>/<run_id>
+branch_prefix = "codex/devloop"
+
+# Abort if the repo is already dirty before the run starts.
+require_clean_worktree = true
+
+# Base directory for run artifacts.
+artifact_dir = ".devloop/runs"
+
+# Shared timeout for implementer and auditor subprocess execution.
+timeout_secs = 1800
+
+[agents.implementer]
+# Label used in reports and artifacts.
+name = "claude"
+
+# Exact argv used to launch the implementer.
+command = ["claude", "-p"]
+
+# "stdin" sends the rendered prompt on stdin.
+# "file" appends the prompt path as the final argv entry.
+input_mode = "stdin"
+
+# The implementer should usually run in the live repo.
+cwd_mode = "repo"
+
+[agents.auditor]
+# Label used in reports and artifacts.
+name = "codex"
+
+# Exact argv used to launch the auditor.
+command = ["codex", "exec"]
+
+# "stdin" sends the rendered prompt on stdin.
+# "file" appends the prompt path as the final argv entry.
+input_mode = "stdin"
+
+# "snapshot" is recommended so the auditor reviews a read-only copy.
+cwd_mode = "snapshot"
+
+[observability]
+# Full prompt/stdout/stderr bodies are always stored as .txt artifacts.
+# This limit only controls inline previews in JSON artifacts like
+# report.json and rounds/*_invocation.json.
+max_inline_text_chars = 20000
+
+[[checks.required]]
+name = "tests"
+command = "uv run pytest -q"
+timeout_secs = 900
+
+[[checks.advisory]]
+name = "lint"
+command = "uv run ruff check ."
+timeout_secs = 300
